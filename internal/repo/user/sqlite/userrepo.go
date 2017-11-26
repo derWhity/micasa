@@ -14,11 +14,12 @@ import (
 
 const (
 	duplicateErrorPrefix = "UNIQUE constraint failed"
+	noResultError        = "sql: no rows in result set"
 	insertQuery          = `INSERT INTO Users(userid, name, passwordHash, fullName) VALUES(?, ?, ?, ?)`
 	deleteQuery          = `DELETE FROM Users WHERE userid = ?`
 	existQuery           = `SELECT COUNT(*) AS count FROM Users WHERE userid = ?`
 	getByIDQuery         = `SELECT
-								(userid, name, passwordHash, fullName, createdAt, updatedAt)
+								userid, name, passwordHash, fullName, createdAt, updatedAt
 							FROM
 								Users
 							WHERE
@@ -49,6 +50,9 @@ func New(db *sqlx.DB) *UserRepo {
 func handleSqliteError(err error, defaultMessage string) error {
 	if strings.HasPrefix(err.Error(), duplicateErrorPrefix) {
 		return repo.ErrDuplicate
+	}
+	if err.Error() == noResultError {
+		return repo.ErrNotExisting
 	}
 	return errors.Wrap(err, defaultMessage)
 }
@@ -101,8 +105,12 @@ func (r *UserRepo) Exists(id models.UserID) (bool, error) {
 }
 
 // GetByID returns the user with the given ID
-func (r *UserRepo) GetByID(id uint) (*models.User, error) {
-	return nil, fmt.Errorf("Not implemented")
+func (r *UserRepo) GetByID(id models.UserID) (*models.User, error) {
+	var user models.User
+	if err := r.db.Get(&user, getByIDQuery, id); err != nil {
+		return nil, handleSqliteError(err, "Failed to retrieve user from database")
+	}
+	return &user, nil
 }
 
 // GetByCredentials returns the user which has the given username and password - this is used for login

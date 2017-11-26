@@ -7,14 +7,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/derWhity/micasa/internal/repo"
-
-	"github.com/derWhity/micasa/internal/models"
-	"github.com/derWhity/micasa/internal/repo/user/sqlite"
-
 	"github.com/derWhity/micasa/internal/fsutils"
 	"github.com/derWhity/micasa/internal/log"
 	"github.com/derWhity/micasa/internal/migrate"
+	"github.com/derWhity/micasa/internal/models"
+	"github.com/derWhity/micasa/internal/repo"
+	"github.com/derWhity/micasa/internal/repo/user/sqlite"
 	kitlog "github.com/go-kit/kit/log"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3" // Just needed for the sqlite driver
@@ -270,7 +268,43 @@ func TestDelete(t *testing.T) {
 }
 
 func TestGetByID(t *testing.T) {
-	t.Skip("Not implemented")
+	Convey("Having a test database instance", t, func() {
+		logger := createTestLogger(t)
+		db, err := setupTestDB(logger)
+		So(err, ShouldBeNil)
+
+		Convey("Having a UserRepo instance", func() {
+			r := sqlite.New(db)
+			So(r, ShouldNotBeNil)
+
+			Convey("Having users in the database", func() {
+				So(createTestUsers(r), ShouldBeNil)
+
+				Convey("Searching for existing users should return exactly those users", func() {
+					for _, user := range testUsers {
+						result, err := r.GetByID(user.ID)
+						So(err, ShouldBeNil)
+						compareUsers(user, *result, testPassword)
+					}
+				})
+
+				Convey("Searching for non-existing users should yield an ErrNotExisting error", func() {
+					for _, id := range []string{"UnknownID", "Nonexistin", "AlsoNotExisting"} {
+						result, err := r.GetByID(models.UserID(id))
+						So(err, ShouldEqual, repo.ErrNotExisting)
+						So(result, ShouldBeNil)
+					}
+				})
+			})
+		})
+
+		Reset(func() {
+			if err := teardownTestDB(db, logger); err != nil {
+				panic(err)
+			}
+		})
+
+	})
 }
 
 func TestGetByCredentials(t *testing.T) {
