@@ -308,7 +308,51 @@ func TestGetByID(t *testing.T) {
 }
 
 func TestGetByCredentials(t *testing.T) {
-	t.Skip("Not implemented")
+	Convey("Having a test database instance", t, func() {
+		logger := createTestLogger(t)
+		db, err := setupTestDB(logger)
+		So(err, ShouldBeNil)
+
+		Convey("Having a UserRepo instance", func() {
+			r := sqlite.New(db)
+			So(r, ShouldNotBeNil)
+
+			Convey("Having users in the database", func() {
+				So(createTestUsers(r), ShouldBeNil)
+
+				Convey("Searching for users with the correct credentials should find the users", func() {
+					for _, user := range testUsers {
+						result, err := r.GetByCredentials(user.Name, testPassword)
+						So(err, ShouldBeNil)
+						compareUsers(user, *result, testPassword)
+					}
+				})
+
+				Convey("Searching for non-existing users should yield an ErrNotExisting error", func() {
+					for _, username := range []string{"nothere", "meneither", "alsonothere"} {
+						result, err := r.GetByCredentials(username, testPassword)
+						So(err, ShouldEqual, repo.ErrNotExisting)
+						So(result, ShouldBeNil)
+					}
+				})
+
+				Convey("Searching for existing users with wrong password should yield an ErrNotExisting error", func() {
+					for _, user := range testUsers {
+						result, err := r.GetByCredentials(user.Name, "definitelyWrong")
+						So(err, ShouldEqual, repo.ErrNotExisting)
+						So(result, ShouldBeNil)
+					}
+				})
+			})
+		})
+
+		Reset(func() {
+			if err := teardownTestDB(db, logger); err != nil {
+				panic(err)
+			}
+		})
+
+	})
 }
 
 func TestFind(t *testing.T) {

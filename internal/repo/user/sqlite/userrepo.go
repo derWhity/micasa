@@ -24,6 +24,12 @@ const (
 								Users
 							WHERE
 								userid = ?`
+	getByNameQuery = `SELECT
+							userid, name, passwordHash, fullName, createdAt, updatedAt
+						FROM
+							Users
+						WHERE
+							name = ?`
 	updateQuery = `UPDATE
 						Users
 					SET
@@ -115,7 +121,14 @@ func (r *UserRepo) GetByID(id models.UserID) (*models.User, error) {
 
 // GetByCredentials returns the user which has the given username and password - this is used for login
 func (r *UserRepo) GetByCredentials(username string, password string) (*models.User, error) {
-	return nil, fmt.Errorf("Not implemented")
+	var user models.User
+	if err := r.db.Get(&user, getByNameQuery, username); err != nil {
+		return nil, handleSqliteError(err, "Failed to retrieve user from database")
+	}
+	if err := user.CheckPassword(password); err != nil {
+		return nil, repo.ErrNotExisting
+	}
+	return &user, nil
 }
 
 // Find searches for users matching the given search string - supports pagination
